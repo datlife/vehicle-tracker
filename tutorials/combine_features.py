@@ -5,9 +5,9 @@ from skimage.feature import hog
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 
+
 def data_look(car_list, not_car_list):
     # Define a function to return some characteristics of the data set
-
     data_dict = {}
     # Define a key in data_dict "n_cars" and store the number of car images
     # Define a key "n_notcars" and store the number of notcar images
