@@ -2,8 +2,9 @@ import cv2
 import os, fnmatch
 import numpy as np
 import time
-from utils import FeatureExtractor
+from utils import FeatureExtractor, WindowSlider
 from utils import SVC
+from utils import get_feature
 
 
 def get_file_names(src_path='./', pattern='*.jpeg'):
@@ -22,8 +23,11 @@ not_cars = get_file_names('./data/non-vehicles', pattern='*.png')
 # Calculate car features & not-car features
 t = time.time()
 print("Calculating features for {} images...".format(len(cars)+len(not_cars)))
-car_features = FeatureExtractor(cars, color_space='YUV').get_feature()
-not_car_features = FeatureExtractor(not_cars, color_space='YUV').get_feature()
+# I could not perform multi-processing on class object so,
+# car_features = FeatureExtractor(cars, color_space='YUV').get_feature()
+# I decided to use regular method
+car_features = get_feature(cars, workers=4)
+not_car_features = get_feature(not_cars, workers=4)
 print("Completed calculating feature in {:f} seconds\n".format((time.time() - t), 3))
 
 # Create data set
@@ -36,3 +40,7 @@ print("Not Car Feature Vector's length: ", len(not_car_features))
 svc = SVC(x, y, test_split=0.01)
 svc.train()
 svc.score()
+
+
+# Create windows
+window = WindowSlider()

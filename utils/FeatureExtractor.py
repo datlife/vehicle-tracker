@@ -1,7 +1,11 @@
 import cv2
+import time
 import numpy as np
 from skimage.feature import hog
 import matplotlib.image as mpimg
+import pathos.multiprocessing as mp
+# Multi-threading:
+# http://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-pythons-multiprocessing-pool-ma?noredirect=1&lq=1
 
 # REMEMBER: when merging features, all features should be in order.
 
@@ -119,5 +123,3 @@ class FeatureExtractor(object):
             avg.append((time.time()-t))
         print("Average time / feature : {} seconds".format(np.average(avg)))
         return np.array(self.features)
-
-

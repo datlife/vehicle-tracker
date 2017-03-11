@@ -9,9 +9,10 @@ class SVC(object):
 
     def __init__(self, x, y, test_split=0.01):
         self.svc = LinearSVC()
+
         # Apply Standard Scalars to normalize vector
-        std_scaler = StandardScaler().fit(x)
-        scaled_x = std_scaler.transform(x)
+        self.std_scaler = StandardScaler().fit(x)
+        scaled_x = self.std_scaler.transform(x)
 
         # Split data: Training Set, Test Set
         random_state = np.random.randint(0, 100)
@@ -29,3 +30,11 @@ class SVC(object):
         print("Testing accuracy:")
         scores = self.svc.score(self.x_test, self.y_test)
         print("Accuracy {:3f}%".format(scores))
+
+    def predict(self, feature):
+        '''
+        Return 1 or 0
+        :param feature:
+        :return:
+        '''
+        return self.svc.predict(feature)
