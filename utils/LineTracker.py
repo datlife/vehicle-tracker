@@ -4,11 +4,13 @@ import numpy as np
 
 class LineTracker(object):
     def __init__(self, window_width, window_height, margin, xm, ym, smooth_factor):
+
         self.window_width = window_width
         self.window_height = window_height
         self.margin = margin
         self.ym_per_pixel = ym
         self.xm_per_pixel = xm
+
         self.smooth_factor = smooth_factor
         self.recent_centers = []           # Store recent windows (left,right)
 
@@ -25,7 +27,6 @@ class LineTracker(object):
         # to get the vertical image slice.
 
         # Then, use np.convolve the vertical image slice with the window template
-
         # Sum quarter bottom of image to get slice, could use a different ratio
         l_sum = np.sum(warped[int(3*r/4):, :int(c/2)], axis=0)
         l_center = np.argmax(np.convolve(windows, l_sum)) - wd_w/2
@@ -61,54 +62,72 @@ class LineTracker(object):
         # Smooth the line
         return np.average(self.recent_centers[-self.smooth_factor:], axis=0)
 
-    def curve_fit(self, img, leftx, rightx):
+    def curve_fit(self, img, line_x, transparency=0.3):
         '''
         Find a polynomial function of left and right lanes as:
         F(x) = Ax^2 + Bx + C
+        @:param line_x : a list of possible lines in the birdeye image
         '''
 
         res_yvals = np.arange(img.shape[0] - (self.window_height/2), 0, -self.window_height)
         ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])
-        y_idx = np.int32(ploty)
 
-        # Fit into a function - return coefficients
-        # Left function
-        l_coeffs = np.polyfit(res_yvals, leftx, deg=2)
-        left_fitx = l_coeffs[0]*ploty**2 + l_coeffs[1]*ploty + l_coeffs[2]
-        left_fitx = np.int32(left_fitx)[0:img.shape[0]]
+        # Find all lines in the bird-eye view
+        lines = []
+        for line in line_x:
+            l_coeffs = np.polyfit(res_yvals, line, deg=2)
+            l_fit = l_coeffs[0]*ploty**2 + l_coeffs[1]*ploty + l_coeffs[2]
+            l_fit = np.int32(l_fit)[0:img.shape[0]]
+            lines.append(l_fit)
 
-        # Right function
-        r_coeffs = np.polyfit(res_yvals, rightx, deg=2)
-        right_fitx = r_coeffs[0]*ploty**2 + r_coeffs[1]*ploty + r_coeffs[2]
-        right_fitx = np.int32(right_fitx)[0:img.shape[0]]
+        lines = self.expand_lanes(img, line_x, res_yvals, ploty, lines)
 
-        left_lane = np.array(list(zip(np.concatenate((left_fitx - self.window_width/2,
-                                                      left_fitx[::-1]+self.window_width/2), axis=0),
-                                      np.concatenate((ploty, ploty[::-1]), axis=0))), dtype='int32')
-        right_lane = np.array(list(zip(np.concatenate((right_fitx - self.window_width/2,
-                                                      right_fitx[::-1]+self.window_width/2), axis=0),
-                                       np.concatenate((ploty, ploty[::-1]), axis=0))), dtype='int32')
-        inner_lane = np.array(list(zip(np.concatenate((left_fitx + self.window_width/2,
-                                                       right_fitx[::-1] - self.window_width/2), axis=0),
+        lanes = []
+        for line in lines:
+            lane = np.array(list(zip(np.concatenate((line - self.window_width/2, line[::-1]+self.window_width/2), axis=0),
+                                     np.concatenate((ploty, ploty[::-1]), axis=0))), dtype='int32')
+            lanes.append(lane)
+
+        inner_lane = np.array(list(zip(np.concatenate((lines[0] + self.window_width/2, lines[-1][::-1] - self.window_width/2), axis=0),
                                        np.concatenate((ploty, ploty[::-1]), axis=0))), dtype='int32')
 
         # Curvature
-        curvature = self.cal_curvature(leftx, rightx, res_yvals, ploty)
+        curvature = 0.
         # Offset
-        offset = self.cal_offset(img, left_fitx, right_fitx)
+        offset = 0.
 
-        output = self.visualize_lanes(img, left_lane, right_lane, inner_lane, offset)
+        # Calculate other lanes based on current lane ?
+        output = self.visualize_lanes(img, lanes, inner_lane, offset, transparency)
 
-        return output, curvature, offset
+        return output, lines, lanes
 
-    def visualize_lanes(self, img, left_lane, right_lane, inner_lane, offset):
+    def expand_lanes(self, img, line_x, res_yvals, ploty, lines):
+        """
+        Expand lane lines to left and right based on histogram
+        :param bin_img:
+        :param line_x:
+        :param res_yvals:
+        :param ploty:
+        :param lines:
+        :return:
+        """
+        # Expand lines to the right
+        expanded_lines = line_x[-1] + (np.mean(line_x[-1]) - np.mean(line_x[-2]) - 20)
+        while np.max(expanded_lines) < img.shape[1]:
+            l_coeffs = np.polyfit(res_yvals, expanded_lines, deg=2)
+            l_fit = l_coeffs[0] * ploty ** 2 + l_coeffs[1] * ploty + l_coeffs[2]
+            l_fit = np.int32(l_fit)[0:img.shape[0]]
+            lines.append(l_fit)
+            expanded_lines += (np.mean(lines[-1]) - np.mean(lines[-2]) - 20)
+        return lines
+
+    def visualize_lanes(self, img, lanes, inner_lane, offset, transparency=0.3):
 
         output = np.zeros_like(img)
         background = np.zeros_like(img)
 
-        # Left & Right lane
-        cv2.fillPoly(output, [left_lane], color=[255, 255, 0])
-        cv2.fillPoly(output, [right_lane], color=[255, 255, 0])
+        for lane in lanes:
+            cv2.fillPoly(output, [lane], color=[255, 255, 0])
 
         # Background -- if offset < 0.5m --> green, else red
         if offset < 0.55:
@@ -116,7 +135,7 @@ class LineTracker(object):
         else:
             background_color = [255, 0, 0]
         cv2.fillPoly(background, [inner_lane], color=background_color)
-        output = cv2.addWeighted(output, 1.0, background, 0.6, 0.0)
+        output = cv2.addWeighted(output, 1.0, background, transparency, 0.0)
 
         return output
 
@@ -137,6 +156,26 @@ class LineTracker(object):
         camera_center = (left_fitx[-1] + right_fitx[-1])/2
         center_diff = (camera_center - img.shape[1]/2)*self.xm_per_pixel
         return center_diff
+
+    def create_windows(self, row, col, left_line, right_line, y_step=20):
+        '''
+        Create a list of windows in bird eye images using left and right line as the boundary
+        :param left_line:
+        :param right_line:
+        :return:
+        '''
+        len_lines = np.mean(right_line) - np.mean(left_line)
+        num_lines = np.int(col/y_step) - 1
+
+        lines = []
+        for ys in range(num_lines):
+            left_x = left_line[0]
+            left_y = ys*y_step
+            right_x = right_line[0]
+            right_y = ys*y_step
+            lines.append(((left_x, left_y), (right_x, right_y)))
+
+        return lines
 
 
 def window_mask(width, height, img, center, level):
@@ -171,6 +210,6 @@ def draw_windows(img, w, h, window_centroids):
     zero_channel = np.zeros_like(template)
     template = np.array(cv2.merge((zero_channel, template, zero_channel)), dtype='uint8')
     warped = 255*np.dstack((img, img, img)).astype('uint8')
-    result = cv2.addWeighted(warped, 0.3, template, 1.0, 0.)
+    result = cv2.addWeighted(warped, 0.6, template, 0.6, 0.)
     return result, leftx, rightx
 

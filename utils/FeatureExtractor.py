@@ -3,7 +3,6 @@ import time
 import numpy as np
 from skimage.feature import hog
 import matplotlib.image as mpimg
-import pathos.multiprocessing as mp
 # Multi-threading:
 # http://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-pythons-multiprocessing-pool-ma?noredirect=1&lq=1
 

@@ -2,7 +2,7 @@ import cv2
 import time
 import numpy as np
 from skimage.feature import hog
-import pathos.multiprocessing as mp
+import multiprocessing as mp
 # Multi-threading:
 # http://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-pythons-multiprocessing-pool-ma?noredirect=1&lq=1
 
@@ -10,7 +10,7 @@ import pathos.multiprocessing as mp
 orient = 9
 pix_per_cell = (8, 8)
 cell_per_block = (2, 2)
-hog_channel = 0 # Can be 0, 1 ,2 or 'ALL'
+hog_channel = 0         # Can be 0, 1 ,2 or 'ALL'
 transform_sqrt = False
 
 # Color Histogram Parameters:
@@ -19,7 +19,7 @@ bins_range = (0, 256)
 
 # Spatial Bin Parameters:
 spatial_size = (32, 32)
-color_space='YUV'
+color_space = 'YUV'
 
 
 def get_feature(images, workers=4):

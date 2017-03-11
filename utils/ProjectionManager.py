@@ -12,18 +12,18 @@ class ProjectionManager(object):
         self.row = row
         self.offset = offset
         if src is None:
-            self.src = np.float32([[[col * 0.05, row],  # bottom-left
-                               [col * 0.95, row],  # bottom-right
-                               [col * 0.60, row * 0.62],  # top-right
+            self.src = np.float32([[[col * 0.05, row],       # bottom-left
+                               [col * 0.95, row],           # bottom-right
+                               [col * 0.57, row * 0.62],    # top-right
                                [col * 0.43, row * 0.62]]])  # top-left
         else:
             self.src = src
 
         if dst is None:
             self.dst = np.float32([[col * 0.15 + offset, row],  # bottom left
-                              [col * 0.90 - offset, row],  # bottom right
-                              [col - offset, 0],  # top right
-                              [offset, 0]])  # top le
+                              [col * 0.90 - offset, row],       # bottom right
+                              [col - offset, 0],                # top right
+                              [offset, 0]])                     # top left
         else:
             self.dst = dst
         self.M = cv2.getPerspectiveTransform(self.src, self.dst)
