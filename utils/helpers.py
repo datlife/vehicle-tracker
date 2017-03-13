@@ -1,7 +1,16 @@
-import numpy as np
 import cv2
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
+import os, fnmatch
+import numpy as np
+
+
+def get_file_names(src_path='./', pattern='*.jpeg'):
+    # Return a list of file names in a given folder with certain pattern
+    # images = glob.glob('../data/**.jpeg')
+    images = []
+    for root, dir_names, file_names in os.walk(src_path):
+        for filename in fnmatch.filter(file_names, pattern):
+            images.append(os.path.join(root, filename))
+    return images
 
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
@@ -13,14 +22,6 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
         cv2.rectangle(draw_img, bbox[0], bbox[1], color, thick)
     # Return the image copy with boxes drawn
     return draw_img
-
-
-def window_mask(width, height, img, center, level):
-    row = img.shape[0]
-    col = img.shape[1]
-    output = np.zeros_like(img)
-    output[int(row - (level+1)*height):int(row - level*height), max(0, int(center-width)):min(int(center+width), col)] = 1
-    return output
 
 
 def draw_windows(img, w, h, window_centroids):
@@ -50,12 +51,11 @@ def draw_windows(img, w, h, window_centroids):
     result = cv2.addWeighted(warped, 0.3, template, 1.0, 0.)
     return result, leftx, rightx
 
-#
-# image = mpimg.imread('bbox-example-image.jpg')
-# # Here are the bounding boxes I used
-# bboxes = [((275, 572), (380, 510)), ((488, 563), (549, 518)), ((554, 543), (582, 522)),
-#           ((601, 555), (646, 522)), ((657, 545), (685, 517)), ((849, 678), (1135, 512))]
-#
-# result = draw_boxes(image, bboxes)
-# plt.imshow(result)
-# plt.show()
+
+def window_mask(width, height, img, center, level):
+    row = img.shape[0]
+    col = img.shape[1]
+    output = np.zeros_like(img)
+    output[int(row - (level+1)*height):int(row - level*height), max(0, int(center-width)):min(int(center+width), col)] = 1
+    return output
+

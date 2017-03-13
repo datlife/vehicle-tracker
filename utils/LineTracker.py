@@ -80,8 +80,6 @@ class LineTracker(object):
             l_fit = np.int32(l_fit)[0:img.shape[0]]
             lines.append(l_fit)
 
-        lines = self.expand_lanes(img, line_x, res_yvals, ploty, lines)
-
         lanes = []
         for line in lines:
             lane = np.array(list(zip(np.concatenate((line - self.window_width/2, line[::-1]+self.window_width/2), axis=0),
@@ -92,34 +90,14 @@ class LineTracker(object):
                                        np.concatenate((ploty, ploty[::-1]), axis=0))), dtype='int32')
 
         # Curvature
-        curvature = 0.
+        curvature = self.cal_curvature(lines[0], lines[1], res_yvals, ploty)
         # Offset
-        offset = 0.
+        offset = self.cal_offset(img, lines[0], lines[1])
 
         # Calculate other lanes based on current lane ?
         output = self.visualize_lanes(img, lanes, inner_lane, offset, transparency)
 
-        return output, lines, lanes
-
-    def expand_lanes(self, img, line_x, res_yvals, ploty, lines):
-        """
-        Expand lane lines to left and right based on histogram
-        :param bin_img:
-        :param line_x:
-        :param res_yvals:
-        :param ploty:
-        :param lines:
-        :return:
-        """
-        # Expand lines to the right
-        expanded_lines = line_x[-1] + (np.mean(line_x[-1]) - np.mean(line_x[-2]) - 20)
-        while np.max(expanded_lines) < img.shape[1]:
-            l_coeffs = np.polyfit(res_yvals, expanded_lines, deg=2)
-            l_fit = l_coeffs[0] * ploty ** 2 + l_coeffs[1] * ploty + l_coeffs[2]
-            l_fit = np.int32(l_fit)[0:img.shape[0]]
-            lines.append(l_fit)
-            expanded_lines += (np.mean(lines[-1]) - np.mean(lines[-2]) - 20)
-        return lines
+        return output, curvature, offset
 
     def visualize_lanes(self, img, lanes, inner_lane, offset, transparency=0.3):
 

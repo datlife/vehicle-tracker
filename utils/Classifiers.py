@@ -1,40 +1,54 @@
 import numpy as np
 import time
+import json
 from sklearn.svm import LinearSVC
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+from yolo.net import TFNet
 
 
-class SVC(object):
+class YOLOV2(object):
+    def __init__(self, cfg_path="cfg/tiny-yolo-voc.cfg", weight_path="bin/tiny-yolo-voc.weights"):
+        option = {"model": cfg_path, "load": weight_path, "threshold": 0.1}
+        self.model = TFNet(option)
 
-    def __init__(self, x, y, test_split=0.01):
-        self.svc = LinearSVC()
+    def train(self, img):
+        raise NotImplemented
 
-        # Apply Standard Scalars to normalize vector
-        self.std_scaler = StandardScaler().fit(x)
-        scaled_x = self.std_scaler.transform(x)
+    def predict(self, img):
+        result = self.model.return_predict(img)
+        boxes = self._convert_json_to_points(result)
+        return boxes
 
-        # Split data: Training Set, Test Set
-        random_state = np.random.randint(0, 100)
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(scaled_x, y, test_size=0.1, random_state=random_state)
-        print("Training data: Features {}, Labels {}".format(len(self.x_train), len(self.y_train)))
-        print("Test data: Features {}, Labels {}".format(len(self.x_test), len(self.y_test)))
+    def _convert_json_to_points(self, jfile):
+        boxes = []
+        for i in jfile:
+            i = str(i).replace("\'", "\"")
+            data = json.loads(i)
+            top = (int(data['topleft']['x']), int(data['topleft']['y']))
+            bot = (int(data['bottomright']['x']), int(data['bottomright']['y']))
+            boxes.append((top, bot))
+        return boxes
 
-    def train(self):
+
+class SupportVectorMachineClassifier(object):
+
+    def __init__(self):
+        self.svc = Pipeline([('scaling', StandardScaler()), ('classification', LinearSVC(loss='hinge')),])
+
+    def train(self, x_train, y_train):
         print("\nStarting to train vehicle detection classifier.")
         start = time.time()
-        self.svc.fit(self.x_train, self.y_train)
+        self.svc.fit(x_train, y_train)
         print("Completed training in {:5f} seconds.\n".format(time.time() - start))
 
-    def score(self):
+    def score(self, x_test, y_test):
         print("Testing accuracy:")
-        scores = self.svc.score(self.x_test, self.y_test)
+        scores = self.svc.score(x_test, y_test)
         print("Accuracy {:3f}%".format(scores))
 
     def predict(self, feature):
-        '''
-        Return 1 or 0
-        :param feature:
-        :return:
-        '''
         return self.svc.predict(feature)
+
+    def decision_function(self, feature):
+        return self.svc.decision_function(feature)

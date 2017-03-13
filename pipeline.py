@@ -1,46 +1,62 @@
 import cv2
-import os, fnmatch
 import numpy as np
-import time
-from utils import FeatureExtractor, WindowSlider
-from utils import SVC
-from utils import get_feature
+import itertools
+from utils import SupportVectorMachineClassifier, YOLOV2
+from utils import get_feature, get_file_names, search_windows, slide_window, draw_boxes
+# Import video and process
+from moviepy.editor import VideoFileClip
 
 
-def get_file_names(src_path='./', pattern='*.jpeg'):
-    # Return a list of file names in a given folder with certain pattern
-    # images = glob.glob('../data/**.jpeg')
-    images = []
-    for root, dir_names, file_names in os.walk(src_path):
-        for filename in fnmatch.filter(file_names, pattern):
-            images.append(os.path.join(root, filename))
-    return images
+def process_image(frame):
+    global clf
+    global yolo
+    global windows
 
-# Import car and not car images
-cars = get_file_names('./data/vehicles', pattern='*.png')
-not_cars = get_file_names('./data/non-vehicles', pattern='*.png')
+    svc_frame = frame.astype(np.float32)
+    # VEHICLE TRACKER
+    # heatmap = np.zeros_like(svc_img[:, :, 0])
+    # positive_windows = search_windows(svc_frame, windows, clf, size=(64, 64), decision_threshold=dec_thresh)
+    positive_windows = yolo.predict(frame)
+    result = draw_boxes(frame, positive_windows)
+    return result
 
-# Calculate car features & not-car features
-t = time.time()
-print("Calculating features for {} images...".format(len(cars)+len(not_cars)))
-# I could not perform multi-processing on class object so,
-# car_features = FeatureExtractor(cars, color_space='YUV').get_feature()
-# I decided to use regular method
-car_features = get_feature(cars, workers=4)
-not_car_features = get_feature(not_cars, workers=4)
-print("Completed calculating feature in {:f} seconds\n".format((time.time() - t), 3))
+if __name__ == "__main__":
+    # Import car and not car images
+    cars = get_file_names('./data/vehicles', pattern='*.png')
+    not_cars = get_file_names('./data/non-vehicles', pattern='*.png')
 
-# Create data set
-x = np.vstack((car_features, not_car_features)).astype(np.float64)
-y = np.concatenate((np.ones(len(car_features)), np.zeros(len(not_car_features))))
-print("Car Feature Vector's length: ", len(car_features))
-print("Not Car Feature Vector's length: ", len(not_car_features))
+    # Calculate car features & not-car features
+    # car_features = get_feature(cars, workers=4)
+    # not_car_features = get_feature(not_cars, workers=4)
 
-# Training using SVC Classifier
-svc = SVC(x, y, test_split=0.01)
-svc.train()
-svc.score()
+    # Create data set
+    # x = np.vstack((car_features, not_car_features)).astype(np.float64)
+    # y = np.concatenate((np.ones(len(car_features)), np.zeros(len(not_car_features))))
+
+    dec_thresh = 0.75
+    window_size = (96, 96)
+    x_region = [None, None]
+    y_region = [400, None]
+    over_lap = (0.7, 0.7)
+    img_size = (720, 1280)
+
+    # Create SVC Classifier
+    clf = SupportVectorMachineClassifier()
+    yolo = YOLOV2()
+
+    # Train classifier
+    # clf.train(x, y)
+
+    # Create sliding windows
+    windows = slide_window(img_size,
+                           x_start_stop=x_region,
+                           y_start_stop=y_region,
+                           xy_window=window_size,
+                           xy_overlap=over_lap)
+
+    output = 'output.mp4'
+    clip1 = VideoFileClip("./project_video.mp4").subclip(6, 12)
+    clip = clip1.fl_image(process_image)  # NOTE: this function expects color images!!
+    clip.write_videofile(output, audio=False)
 
 
-# Create windows
-window = WindowSlider()
