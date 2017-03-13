@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from utils.CameraCalibrator import CameraCalibrator
 
 # Define source and destination points
 offset = 300

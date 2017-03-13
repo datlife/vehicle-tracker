@@ -1,6 +1,94 @@
 import numpy as np
 import cv2
-from utils.feature_extractor import extract_feature
+from utils.feature_extractor import extract_feature, get_hog_features, bin_spatial, color_hist, convert_color
+
+# Define a single function that can extract features using hog sub-sampling and make predictions
+
+
+def find_cars(img, ystart, ystop, scale, svc, orient=9, pix_per_cell=8, cell_per_block=2, spatial_size=32, hist_bins=32):
+    draw_img = np.copy(img)
+    img = img.astype(np.float32) / 255
+
+    img_to_search = img[ystart:ystop, :, :]
+    ctrans_to_search = convert_color(img_to_search, conv='RGB2YCrCb')
+    if scale != 1:
+        imshape = ctrans_to_search.shape
+        ctrans_to_search = cv2.resize(ctrans_to_search, (np.int(imshape[1] / scale), np.int(imshape[0] / scale)))
+
+    ch1 = ctrans_to_search[:, :, 0]
+    ch2 = ctrans_to_search[:, :, 1]
+    ch3 = ctrans_to_search[:, :, 2]
+
+    # Define blocks and steps as above
+    nxblocks = (ch1.shape[1] // pix_per_cell) - 1
+    nyblocks = (ch1.shape[0] // pix_per_cell) - 1
+    nfeat_per_block = orient * cell_per_block ** 2
+    # 64 was the original sampling rate, with 8 cells and 8 pix per cell
+    window = 64
+    nblocks_per_window = (window // pix_per_cell) - 1
+    cells_per_step = 2  # Instead of overlap, define how many cells to step
+    nxsteps = (nxblocks - nblocks_per_window) // cells_per_step
+    nysteps = (nyblocks - nblocks_per_window) // cells_per_step
+
+    # Compute individual channel HOG features for the entire image
+    hog1 = get_hog_features(ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    hog2 = get_hog_features(ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    hog3 = get_hog_features(ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
+
+    for xb in range(nxsteps):
+        for yb in range(nysteps):
+            ypos = yb * cells_per_step
+            xpos = xb * cells_per_step
+            # Extract HOG for this patch
+            hog_feat1 = hog1[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
+            hog_feat2 = hog2[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
+            hog_feat3 = hog3[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
+            hog_features = np.hstack((hog_feat1, hog_feat2, hog_feat3))
+
+            xleft = xpos * pix_per_cell
+            ytop = ypos * pix_per_cell
+
+            # Extract the image patch
+            subimg = cv2.resize(ctrans_to_search[ytop:ytop + window, xleft:xleft + window], (64, 64))
+
+            # Get color features
+            spatial_features = bin_spatial(subimg, size=spatial_size)
+            hist_features = color_hist(subimg, nbins=hist_bins)
+
+            # Scale features and make a prediction
+            test_features = np.hstack((spatial_features, hist_features, hog_features)).reshape(1, -1)
+            # Standard_scaler already embedded in SVC object
+            test_prediction = svc.predict(test_features)
+
+            if test_prediction == 1:
+                xbox_left = np.int(xleft * scale)
+                ytop_draw = np.int(ytop * scale)
+                win_draw = np.int(window * scale)
+                cv2.rectangle(draw_img, (xbox_left, ytop_draw + ystart),
+                              (xbox_left + win_draw, ytop_draw + win_draw + ystart), (0, 0, 255), 6)
+
+    return draw_img
+
+
+def search_windows(frame, windows, clf, size=(64, 64), decision_threshold=0.3):
+    on_windows = []
+    for window in windows:
+        # Get a region of an image
+        region = cv2.resize(frame[window[0][1]:window[1][1], window[0][0]:window[1][0]], size)
+
+        # Extract feature of mini image
+        region_feature = np.concatenate(extract_feature(region))
+        region_feature = region_feature.astype(np.float64).reshape(1, -1)
+
+        # Pedict using your classifier
+        dec = clf.decision_function(region_feature)
+        prediction = int(dec > decision_threshold)
+
+        # If positive (prediction == 1) then save the window
+        if prediction == 1:
+            on_windows.append(window)
+    return on_windows
+
 
 def slide_window(img_size, x_start_stop=[None, None], y_start_stop=[None, None],
                  xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
@@ -45,94 +133,6 @@ def slide_window(img_size, x_start_stop=[None, None], y_start_stop=[None, None],
     return window_list
 
 
-def search_windows(frame, windows, clf, size=(64, 64), decision_threshold=0.3):
-    on_windows = []
-    for window in windows:
-        # Get a region of an image
-        region = cv2.resize(frame[window[0][1]:window[1][1], window[0][0]:window[1][0]], size)
-
-        # Extract feature of mini image
-        region_feature = np.concatenate(extract_feature(region))
-        region_feature = region_feature.astype(np.float64).reshape(1, -1)
-
-        # Pedict using your classifier
-        dec = clf.decision_function(region_feature)
-        prediction = int(dec > decision_threshold)
-
-        # If positive (prediction == 1) then save the window
-        if prediction == 1:
-            # rint"Found it!"
-            on_windows.append(window)
-    return on_windows
-
-
-class WindowSlider(object):
-    def __init__(self, x_region=[None, None], y_region=[None, None], xy_window=(96, 96), xy_overlap=(0.5, 0.5), default_window_size=(64, 64)):
-        self.windows = self.slide_window(x_region, y_region, xy_window, xy_overlap)
-        self.window_size = default_window_size
-        self.overlap = xy_overlap
-
-    # Create a list of windows for SVC to select a region of image and compare with the feature vector
-    def slide_window(self, img_size, x_start_stop=[None, None], y_start_stop=[None, None],
-                     xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
-        """Returns all windows to search in an image.
-        No classification has been done at this stage.
-        """
-        # If x and/or y start/stop positions not defined, set to image size
-        if x_start_stop[0] == None:
-            x_start_stop[0] = 0
-        if x_start_stop[1] == None:
-            x_start_stop[1] = img_size[1]
-        if y_start_stop[0] == None:
-            y_start_stop[0] = 0
-        if y_start_stop[1] == None:
-            y_start_stop[1] = img_size[0]
-
-            # Compute the span of the region to be searched
-        xspan = x_start_stop[1] - x_start_stop[0]
-        yspan = y_start_stop[1] - y_start_stop[0]
-
-        # Compute the number of pixels per step in x/y
-        nx_pix_per_step = np.int(xy_window[0] * (1 - xy_overlap[0]))
-        ny_pix_per_step = np.int(xy_window[1] * (1 - xy_overlap[1]))
-
-        # Compute the number of windows in x/y
-        nx_windows = np.int(x_span / nx_pix_per_step) - 1
-        ny_windows = np.int(y_span / ny_pix_per_step) - 1
-
-        # Initialize a list to append window positions to
-        window_list = []
-
-        for ys in range(ny_windows):
-            for xs in range(nx_windows):
-                # Calculate window position
-                start_x = xs * nx_pix_per_step + x_start_stop[0]
-                end_x = start_x + xy_window[0]
-                start_y = ys * ny_pix_per_step + y_start_stop[0]
-                end_y = start_y + xy_window[1]
-
-                window_list.append(((start_x, start_y), (end_x, end_y)))
-        # Return the list of windows
-        return window_list
-
-    def search_windows(self, frame, clf, decision_threshold=0.3):
-        on_windows = []
-        for window in self.windows:
-            # Get a region of an image
-            region = cv2.resize(frame[window[0][1]:window[1][1], window[0][0]:window[1][0]], self.window_size)
-
-            # Extract feature of mini image
-            region_feature = np.concatenate(extract_feature(region))
-            region_feature = region_feature.astype(np.float64).reshape(1, -1)
-
-            # Predict using your classifier
-            dec = clf.decision_function(region_feature)
-            prediction = int(dec > decision_threshold)
-
-            # If positive (prediction == 1) then save the window
-            if prediction == 1:
-                on_windows.append(window)
-        return on_windows
 
 
 
