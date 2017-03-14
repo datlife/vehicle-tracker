@@ -5,23 +5,23 @@ from utils.feature_extractor import extract_feature, get_hog_features, bin_spati
 # Define a single function that can extract features using hog sub-sampling and make predictions
 
 
-def find_cars(img, ystart, ystop, scale, svc, orient=9, pix_per_cell=8, cell_per_block=2, spatial_size=32, hist_bins=32):
-    draw_img = np.copy(img)
+def find_cars(img, ystart, ystop, scale, svc, dec_thresh=0.75, orient=9, pix_per_cell=8, cell_per_block=2,
+              spatial_size=32, hist_bins=32):
     img = img.astype(np.float32) / 255
+
+    # Make a heat map of zero
+    heatmap = np.zeros_like(img[:, :, 0])
 
     img_to_search = img[ystart:ystop, :, :]
     ctrans_to_search = convert_color(img_to_search, conv='RGB2YCrCb')
+
     if scale != 1:
         imshape = ctrans_to_search.shape
         ctrans_to_search = cv2.resize(ctrans_to_search, (np.int(imshape[1] / scale), np.int(imshape[0] / scale)))
 
-    ch1 = ctrans_to_search[:, :, 0]
-    ch2 = ctrans_to_search[:, :, 1]
-    ch3 = ctrans_to_search[:, :, 2]
-
     # Define blocks and steps as above
-    nxblocks = (ch1.shape[1] // pix_per_cell) - 1
-    nyblocks = (ch1.shape[0] // pix_per_cell) - 1
+    nxblocks = (ctrans_to_search.shape[1] // pix_per_cell) - 1
+    nyblocks = (ctrans_to_search.shape[0] // pix_per_cell) - 1
     nfeat_per_block = orient * cell_per_block ** 2
     # 64 was the original sampling rate, with 8 cells and 8 pix per cell
     window = 64
@@ -31,10 +31,11 @@ def find_cars(img, ystart, ystop, scale, svc, orient=9, pix_per_cell=8, cell_per
     nysteps = (nyblocks - nblocks_per_window) // cells_per_step
 
     # Compute individual channel HOG features for the entire image
-    hog1 = get_hog_features(ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
-    hog2 = get_hog_features(ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
-    hog3 = get_hog_features(ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    hog1 = get_hog_features(ctrans_to_search, ch=0, feature_vec=False)
+    hog2 = get_hog_features(ctrans_to_search, ch=1, feature_vec=False)
+    hog3 = get_hog_features(ctrans_to_search, ch=2, feature_vec=False)
 
+    img_boxes = []
     for xb in range(nxsteps):
         for yb in range(nysteps):
             ypos = yb * cells_per_step
@@ -52,22 +53,25 @@ def find_cars(img, ystart, ystop, scale, svc, orient=9, pix_per_cell=8, cell_per
             subimg = cv2.resize(ctrans_to_search[ytop:ytop + window, xleft:xleft + window], (64, 64))
 
             # Get color features
-            spatial_features = bin_spatial(subimg, size=spatial_size)
+            spatial_features = bin_spatial(subimg, size=(spatial_size, spatial_size))
             hist_features = color_hist(subimg, nbins=hist_bins)
 
             # Scale features and make a prediction
             test_features = np.hstack((spatial_features, hist_features, hog_features)).reshape(1, -1)
-            # Standard_scaler already embedded in SVC object
-            test_prediction = svc.predict(test_features)
+            # Pedict using your classifier
+            dec = svc.decision_function(test_features)
+            prediction = int(dec > dec_thresh)
 
-            if test_prediction == 1:
+            # If positive (prediction == 1) then save the window
+            if prediction == 1:
                 xbox_left = np.int(xleft * scale)
                 ytop_draw = np.int(ytop * scale)
                 win_draw = np.int(window * scale)
-                cv2.rectangle(draw_img, (xbox_left, ytop_draw + ystart),
-                              (xbox_left + win_draw, ytop_draw + win_draw + ystart), (0, 0, 255), 6)
+                heatmap[ytop_draw + ystart:ytop_draw + win_draw + ystart, xbox_left:xbox_left + win_draw] += 1
+                img_boxes.append(
+                    ((xbox_left, ytop_draw + ystart), (xbox_left + win_draw, ytop_draw + ystart + win_draw)))
 
-    return draw_img
+    return heatmap, img_boxes
 
 
 def search_windows(frame, windows, clf, size=(64, 64), decision_threshold=0.3):

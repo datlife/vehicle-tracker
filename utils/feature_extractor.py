@@ -68,7 +68,7 @@ def extract_feature(img):
     color_feat = color_hist(feature_img)
     feature.append(color_feat)
 
-    hog_feat = get_hog_features(feature_img, visual=False)
+    hog_feat = get_hog_features(feature_img)
     feature.append(hog_feat)
 
     return feature
@@ -83,24 +83,43 @@ def convert_color(img, conv='RGB2YCrCb'):
         return cv2.cvtColor(img, cv2.COLOR_RGB2LUV)
 
 
-def get_hog_features(img, orient=9, pix_per_cell=8, cell_per_block=2,
-                     vis=False, feature_vec=True):
-    # Call with two outputs if vis==True
-    if vis == True:
-        features, hog_image = hog(img, orientations=orient,
+def get_hog_features(img, ch='ALL', orient=9, pix_per_cell=8, cell_per_block=2, vis=False, feature_vec=True):
+    if ch == 'ALL':
+        hog_features = []
+        for c in range(img.shape[2]):
+            if vis is True:
+                hog_feature, hog_img = hog(img[:, :, c], orientations=orient,
+                                           pixels_per_cell=(pix_per_cell, pix_per_cell),
+                                           cells_per_block=(cell_per_block, cell_per_block),
+                                           transform_sqrt=transform_sqrt,
+                                           visualise=True, feature_vector=feature_vec)
+            else:
+                hog_feature = hog(img[:, :, c], orientations=orient,
                                   pixels_per_cell=(pix_per_cell, pix_per_cell),
                                   cells_per_block=(cell_per_block, cell_per_block),
-                                  transform_sqrt=False,
-                                  visualise=vis, feature_vector=feature_vec)
-        return features, hog_image
-    # Otherwise call with one output
+                                  transform_sqrt=transform_sqrt,
+                                  visualise=False, feature_vector=feature_vec)
+
+            hog_features.append(hog_feature)
+
+        hog_features = np.ravel(hog_features)
     else:
-        features = hog(img, orientations=orient,
-                       pixels_per_cell=(pix_per_cell, pix_per_cell),
-                       cells_per_block=(cell_per_block, cell_per_block),
-                       transform_sqrt=False,
-                       visualise=vis, feature_vector=feature_vec)
-        return features
+        if vis is True:
+            hog_features, hog_img = hog(img[:, :, ch], orientations=orient,
+                                        pixels_per_cell=(pix_per_cell, pix_per_cell),
+                                        cells_per_block=(cell_per_block, cell_per_block),
+                                        transform_sqrt=transform_sqrt,
+                                        visualise=True, feature_vector=feature_vec)
+        else:
+            hog_features = hog(img[:, :, ch], orientations=orient,
+                               pixels_per_cell=(pix_per_cell, pix_per_cell),
+                               cells_per_block=(cell_per_block, cell_per_block),
+                               transform_sqrt=transform_sqrt,
+                               visualise=False, feature_vector=feature_vec)
+    if vis is True:
+        return hog_features, hog_img
+    else:
+        return hog_features
 
 
 def bin_spatial(img, size=(32, 32)):
