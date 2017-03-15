@@ -3,7 +3,7 @@ import time
 import numpy as np
 from skimage.feature import hog
 import multiprocessing as mp
-
+from  threading import RLock, Lock
 
 # ############################
 # CONFIGURATION
@@ -23,20 +23,31 @@ bin_range = (0.0, 1.)
 spatial_size = (32, 32)
 color_space = 'YCrCb'
 
+clahe = cv2.createCLAHE(clipLimit=2.0)
+
 
 def get_feature(images, workers=4):
     pool = mp.Pool(processes=workers)
-    avg, features = zip(*pool.map(process_img, images))
+    results = []
+    t = time.time()
+
+    for img in images:
+        image = cv2.cvtColor(cv2.imread(img), cv2.COLOR_BGR2RGB)
+        image = adaptive_equalize_image(image)
+        results.append(image)
+
+    avg, features = zip(*pool.map(process_img, results))
+    print("Total time: {} seconds".format(time.time() - t))
     print("Average time / feature : {} seconds".format(np.average(avg)))
     test = cv2.cvtColor(cv2.imread(images[0]), cv2.COLOR_BGR2RGB)/255
     print("Max Value {} Min Value {}\n".format(np.max(test), np.min(test)))
+
     return features
 
 
 def process_img(img):
     t = time.time()
-    image = cv2.cvtColor(cv2.imread(img), cv2.COLOR_BGR2RGB)
-    feature = np.concatenate(extract_feature(image))
+    feature = np.concatenate(extract_feature(img))
     avg = (time.time() - t)
     return avg, feature
 
@@ -72,6 +83,27 @@ def extract_feature(img):
     feature.append(hog_feat)
 
     return feature
+
+
+def adaptive_equalize_image(img, level=2.0):
+    """
+    Equalize an image - Increase contrast for the image
+        # http://docs.opencv.org/3.1.0/d5/daf/tutorial_py_histogram_equalization.html
+
+    :param img:    an image
+    :param level:  clipLevel
+    :return: a equalized image
+    """
+
+    if img.shape[2] == 3:
+        lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+        cl = clahe.apply(l)
+        result = cv2.merge((cl, a, b))
+        result = cv2.cvtColor(result, cv2.COLOR_LAB2RGB)
+    else:
+        result = clahe.apply(img)
+    return result
 
 
 def convert_color(img, conv='RGB2YCrCb'):
