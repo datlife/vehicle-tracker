@@ -21,6 +21,7 @@ class SupportVectorMachineClassifier(object):
         print("Testing accuracy:")
         scores = self.svc.score(x_test, y_test)
         print("Accuracy {:3f}%".format(scores))
+        return scores
 
     def predict(self, feature):
         return self.svc.predict(feature)
