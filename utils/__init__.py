@@ -1,4 +1,4 @@
-from utils.Classifiers import SupportVectorMachineClassifier, YOLOV2
+from utils.Classifiers import SupportVectorMachineClassifier, YOLOV2, ResNet
 from utils.LineTracker import LineTracker
 from utils.DiagnosticMgr import DiagnosticMgr
 from utils.ProjectionManager import ProjectionManager
