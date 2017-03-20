@@ -102,12 +102,16 @@ Testing accuracy:
 Accuracy 0.992399%
 ```
 
-
 ## 3. Vehicle Detection
 There will be two parts:
 
 * Using sliding technique: slow and provide a lot of False Positives
 * Using subsampling HOG and adding heatmap threshold: faster and eliminate a lot of False Positives
+
+1. Describe how (and identify where in your code) you implemented a sliding window search. How did you decide what scales to search and how much to overlap windows?
+I decided to search random window positions at random scales all over the image and came up with this (ok just kidding I didn't actually ;)
+
+2. Show some examples of test images to demonstrate how your pipeline is working. What did you do to optimize the performance of your classifier?
 
 ## 4. Vehicle Tracking
 
@@ -117,7 +121,21 @@ We created two object in order to make the tracking task easier: `Vehicle` and `
 * `VehicleTracker` object keeps track a list of current tracked vehicles and making new adjustments based on new heatmaps from video stream
 
 
-## 5. Video Pipeline
+## 5. Video Implementation
+
+1. Provide a link to your final video output. Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.) 
+
+Here's a link to my video result: 
+
+2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
+
+I recorded the positions of positive detections in each frame of the video. From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions. I then used scipy.ndimage.measurements.label() to identify individual blobs in the heatmap. I then assumed each blob corresponded to a vehicle. I constructed bounding boxes to cover the area of each blob detected.
+
+Here's an example result showing the heatmap from a series of frames of video, the result of scipy.ndimage.measurements.label() and the bounding boxes then overlaid on the last frame of video:
+
+Here are six frames and their corresponding heatmaps:
+
+
 ```
 # Parameter
 xstart = [500, 0]
@@ -154,3 +172,12 @@ def process_image(frame):
     svc_img = cv2.addWeighted(svc_img, 0.8, img, 1.0, 0.0)
     return svc_img
 ```
+
+## Discussion
+1. Briefly discuss any problems / issues you faced in your implementation of this project. Where will your pipeline likely fail? What could you do to make it more robust?
+
+Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.
+
+The pipeline still detects a few false positives. One thing that can help make this more reliable would be a way to detect the horizon and automatically mask out only those places where a vehicle can show up.
+
+The current pipeline runs at a speed of ~3-6 frames per second on a 2011 Macbook Pro. Using convolutional neural networks for the initial segmentation of the image might be much faster than a Support Vector Machine classifier such as the one used here. This might enable real-time vehicle detection and tracking.
