@@ -116,3 +116,40 @@ We created two object in order to make the tracking task easier: `Vehicle` and `
 * `Vehicle` object holds information about the bounding box, pixels belong to an vehicle and old bounding boxes.
 * `VehicleTracker` object keeps track a list of current tracked vehicles and making new adjustments based on new heatmaps from video stream
 
+## 5. Video Pipeline
+```
+# Parameter
+xstart = [500, 0]
+xstop =  [1280, 1280]
+ystart = [400, 400]
+ystop =  [506,  656]
+scales = [0.75,1.35]
+# Vehicle Tracker
+car_tracker = VehicleTracker(looking_back_frames=15)
+
+def process_image(frame):
+    global svc
+    global car_tracker
+    global ystar, ystop, scale
+    svc_img = np.copy(frame)
+    
+    heatmaps = []
+    # Multi-scale window
+    for i, scale in enumerate(scales):
+        heatmap, windows = find_cars(frame,xstart[i], xstop[i], ystart[i], ystop[i], scale, svc, dec_thresh=0.99)
+        heatmaps.append(heatmap)
+        
+    # Combine heat map
+    heatmap = np.sum(heatmaps, axis=0)
+    heatmap[heatmap <= 5.] = 0
+    cars, heatmap = car_tracker.update(heatmap, heat_threshold=30)
+    
+    # Draw car boxes
+    for p1, p2 in itertools.chain(cars):
+        cv2.rectangle(svc_img, p1, p2, (255, 255, 255), 4)
+    # Create an heat image
+    img = 255*heatmap/np.max(heatmap)
+    img = np.dstack((img, heatmap, heatmap)).astype(np.uint8)
+    svc_img = cv2.addWeighted(svc_img, 0.8, img, 1.0, 0.0)
+    return svc_img
+```
