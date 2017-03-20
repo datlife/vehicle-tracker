@@ -6,11 +6,11 @@ This repo is the Project 5 of Udacity Self-Driving Car Nanodegree.
 In the next following sections, we would walk through the pipeline how to detect and track cars from a video stream using Support Vector Machine (SVM) Classifier. This process involves few intersting Computer Vision topics such as Histogram of Gradients (HOG), Spatial binary and Color Histogram.
 
 We divided this tutorial the into serval sections : 
-1. [Extract Image Feature Vector](1-extract-image-feature-vector)
-2. [Train SVM Classifier](2-train-svm-classifier) 
-3. [Vehicle Detection](3-vehicle-detection) 
-4. [Vehicle Tracking](4-vehicle-tracking)
-5. [Video Pipeline](5-video-pipeline)
+1. [Extract Image Feature Vector](#1-extract-image-feature-vector)
+2. [Train SVM Classifier](#2-train-svm-classifier) 
+3. [Vehicle Detection](#3-vehicle-detection) 
+4. [Vehicle Tracking](#4-vehicle-tracking)
+5. [Video Pipeline](#5-video-pipeline)
 
 ## 1. Extract Image Feature Vector
 The goal is to extract useful information from image so that the computer can quickly detect where is the car and where is not the car. One powerful way is to extract the Histogram of Gradients (Shape of the object), Color histogram (color of the object) and Spatial binary (overal feature of the object). Here is the example of a car and not-a-car image:
