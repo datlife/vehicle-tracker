@@ -68,5 +68,6 @@ def adaptive_equalize_image(img, level):
 | `color_space`| `YCrCb` |
 | `spatial_bin`| (32, 32)| 
 
+In following graph, we extract features from two images and display in order of : Spatial Bin, Color Histogram, Histogram of Gradient
 ![](./docs/vector.png)
 
