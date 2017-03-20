@@ -5,7 +5,7 @@ This repo is the Project 5 of Udacity Self-Driving Car Nanodegree.
 
 In the next following sections, we would walk through the pipeline how to detect and track cars from a video stream using Support Vector Machine (SVM) Classifier. This process involves few intersting Computer Vision topics such as Histogram of Gradients (HOG), Spatial binary and Color Histogram.
 
-We divided this tutorial the into serval sections : 
+We divided this tutorial the into several sections : 
 1. [Extract Image Feature Vector](#1-extract-image-feature-vector)
 2. [Train SVM Classifier](#2-train-svm-classifier) 
 3. [Vehicle Detection](#3-vehicle-detection) 
@@ -111,10 +111,11 @@ There will be two parts:
 
 ## 4. Vehicle Tracking
 
-We created two object in order to make the tracking task easier: `Vehicle` and `VehicleTracker`.
+We created two object in order to make the tracking task easier: `Vehicle` and `VehicleTracker`. Both are available under `utils/VehicleTracker.py`
 
 * `Vehicle` object holds information about the bounding box, pixels belong to an vehicle and old bounding boxes.
 * `VehicleTracker` object keeps track a list of current tracked vehicles and making new adjustments based on new heatmaps from video stream
+
 
 ## 5. Video Pipeline
 ```
