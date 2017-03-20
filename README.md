@@ -13,12 +13,13 @@ We divided this tutorial the into serval sections :
 5. [Video Pipeline]()
 
 ## Extract Image Feature Vector
+The goal is to extract useful information from image so that the computer can quickly detect where is the car and where is not the car. One powerful way is to extract the Histogram of Gradients (Shape of the object), Color histogram (color of the object) and Spatial binary (overal feature of the object). Here is the example of a car and not-a-car image:
+![](./docs/car-not-car.png)
 
 #### Trick 1: Adaptive Histogram Equalization before extracting feature.
 We discovered that the training data is somewhat blurry and noisy. In this project, we combine the Feature vector of each image so it is important to have a clear image for training. In Deep Learning approach, however, it might help the model generalize better.
 
-By applying `Adaptive Histogram Equalization` (AHE), we could achieve better image quality. **The tradeoff is speed. However, we only apply AHE during training.**
-
+By applying `Adaptive Histogram Equalization` (AHE), we could achieve better image quality. **The trade-off is speed**. Thus, we only apply AHE during training.**
 ```
 def adaptive_equalize_image(img, level):
     """
@@ -35,6 +36,7 @@ def adaptive_equalize_image(img, level):
         result = clahe.apply(img)
     return result
 ```
+![alt-text](./docs/adaptive.png)
 
 #### Pre-processing:
 `adaptive_histogram_equalization`: **True**
@@ -66,4 +68,5 @@ def adaptive_equalize_image(img, level):
 | `color_space`| `YCrCb` |
 | `spatial_bin`| (32, 32)| 
 
+![](./docs/vector.png)
 
