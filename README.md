@@ -179,5 +179,3 @@ def process_image(frame):
 Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.
 
 The pipeline still detects a few false positives. One thing that can help make this more reliable would be a way to detect the horizon and automatically mask out only those places where a vehicle can show up.
-
-The current pipeline runs at a speed of ~3-6 frames per second on a 2011 Macbook Pro. Using convolutional neural networks for the initial segmentation of the image might be much faster than a Support Vector Machine classifier such as the one used here. This might enable real-time vehicle detection and tracking.
