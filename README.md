@@ -109,3 +109,10 @@ There will be two parts:
 * Using sliding technique: slow and provide a lot of False Positives
 * Using subsampling HOG and adding heatmap threshold: faster and eliminate a lot of False Positives
 
+## 4. Vehicle Tracking
+
+We created two object in order to make the tracking task easier: `Vehicle` and `VehicleTracker`.
+
+* `Vehicle` object holds information about the bounding box, pixels belong to an vehicle and old bounding boxes.
+* `VehicleTracker` object keeps track a list of current tracked vehicles and making new adjustments based on new heatmaps from video stream
+
