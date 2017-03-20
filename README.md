@@ -1,7 +1,7 @@
 # Vehicle Detection and Tracking
 --------------------------------
 
-This repo is the Project 5 of Udacity Self-Driving Car Nanadegree. 
+This repo is the Project 5 of Udacity Self-Driving Car Nanodegree. 
 
 In the next following sections, we would walk through the pipeline how to detect and track cars from a video stream using Support Vector Machine (SVM) Classifier. This process involves few intersting Computer Vision topics such as Histogram of Gradients (HOG), Spatial binary and Color Histogram.
 
