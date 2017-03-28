@@ -1,5 +1,6 @@
 # Vehicle Detection and Tracking
 --------------------------------
+Output video is [here](./result.mp4) ( or manually download at `./result.mp4`)
 
 This repo is the Project 5 of Udacity Self-Driving Car Nanodegree. 
 
