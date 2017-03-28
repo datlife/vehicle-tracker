@@ -117,24 +117,191 @@ I decided to search random window positions at random scales all over the image 
 
 We created two object in order to make the tracking task easier: `Vehicle` and `VehicleTracker`. Both are available under `utils/VehicleTracker.py`
 
+Blob and Watershed algorithms are suitable in this problem. I tried to implemented from stratch, however, it is good to know that OPENCV provided the algorithm so no need to "reinvent-the-wheels" unless you want to learn.
+
+
 * `Vehicle` object holds information about the bounding box, pixels belong to an vehicle and old bounding boxes.
-* `VehicleTracker` object keeps track a list of current tracked vehicles and making new adjustments based on new heatmaps from video stream
+* `VehicleTracker` object keeps track a list of current tracked vehicles and making new adjustments based on new heatmaps from video stream.
+```
+class Vehicle(object):
+    # A flavor of Blob algorithm
+    def __init__(self, x, y):
+        self.id = 1
+        # Bounding Box
+        self.minx = x
+        self.miny = y
+        self.maxx = x
+        self.maxy = y
+        # Collection of pixels in that bounding box
+        self.points = []
+        self.old_bbox = []
+        self.points.append((x, y))
+        
+    def add(self, x, y):
+        # Add a new pixel into current Vehicle
+        self.points.append((x, y))  
+        # Update the bounding box
+        # Get the current min and max pixel - to avoid left box stay stilled.
+        self.minx = min(self.minx, x)
+        self.miny = min(self.miny, y)
+        self.maxx = max(self.maxx, x)
+        self.maxy = max(self.maxy, y)
+
+    def isNear(self, x, y):
+        # Determine if a new pixel (x, y) is belong to current object 
+        # Get The center of the box
+        cx = (self.minx + self.maxx)/2
+        cy = (self.miny + self.maxy)/2
+        if cx == x and cy == y:
+            return True
+        # Distance(edge, pixel)
+        dist = self.distSqt(cx, cy, x, y)
+
+        # If distance is under a cetrain threshold. we can determine this pixel belongs to the current object
+        # If blob is too small, update this10Vehicle.distance_threshold:
+        if dist < 100:
+            return True
+        else:
+            return False
+
+    def distSqt(self, x1, y1, x2, y2):
+        # Calculate Distance between two pixels
+        delta_x = x1-x2
+        delta_y = y1-y2
+        dist = np.sqrt(delta_x**2 + delta_y**2)
+        return dist
+
+    def clear(self):
+        ''' Clear hot pixels from previous frames, except the boundary'''
+        # Save old bounding box
+        self.old_bbox.append(((self.minx, self.miny), (self.maxx, self.maxy)))
+        if len(self.old_bbox) > 10:
+            self.old_bbox.pop(0)
+        self.minx = 1280
+        self.miny = 720
+        self.maxx = 0
+        self.maxy = 0
+        self.points = []
+        
+    def get_center(self):
+        # Get The edge of bounding box that closest to (x,y)
+        cx = (self.minx + self.maxx)/2
+        cy = (self.miny + self.maxy)/2
+        return (cx, cy)
+    
+    def size(self):
+        return abs(self.maxx - self.minx)*abs(self.maxy - self.miny)
+    
+    def show(self):
+        if len(self.old_bbox) > 2:
+            self.update_box(lr=0.5)
+        return (self.minx, self.miny), (self.maxx, self.maxy)
+    
+    def in_frame(self):
+        area = abs(self.maxx - self.minx)*abs(self.maxy - self.miny)
+        if area is 0 : return False
+        if len(self.points)/area < 0.3:
+            return False
+        else:
+            return True
+    
+    def get_poins(self):
+        return self.points
+    
+    def update_box(self, lr=0.6):
+        # Get the current min and max pixel
+        (minx, miny), (maxx, maxy) = np.average(self.old_bbox, axis=0).astype(np.int)
+
+        self.minx = int((1-lr)*self.minx + lr*minx)
+        self.miny = int((1-lr)*self.miny + lr*miny)
+        self.maxx = int((1-lr)*self.maxx + lr*maxx)
+        self.maxy = int((1-lr)*self.maxy + lr*maxy)
+```
+
+```
+class VehicleTracker(object):
+    
+    def __init__(self, looking_back_frames=10):
+        #  List of previous heat_maps
+        self.heat_maps = []
+        # How far to look back
+        self.smooth_factor = looking_back_frames
+        #  Tracked Vehicles
+        self.tracked_vehicles = []
+
+    def update(self, new_heat_map, heat_threshold=10):
+        
+        # If we are just started to recording
+        if len(self.heat_maps) < self.smooth_factor:
+            self.heat_maps.append(new_heat_map)
+            updated_map = np.sum(self.heat_maps, axis=0)
+            # Remove objects that are not cars - low threshold
+            updated_map[updated_map <= (heat_threshold*(len(self.heat_maps)*1.5/self.smooth_factor))] = 0
+        else:
+            # Add new map to current heatmap
+            self.heat_maps.append(new_heat_map)
+            updated_map = np.sum(self.heat_maps, axis=0)
+            
+            # Remove the earliest heat map
+            earliest_map = self.heat_maps.pop(0)
+            updated_map -= earliest_map
+            
+            # Remove objects that are not cars - low threshold
+            updated_map[updated_map <= heat_threshold] = 0
+
+        # list of all detected cars
+        potential_cars = self.find_vehicles(updated_map)
+        
+        # Check if car is far from us
+        self.tracked_vehicles = [car for car in potential_cars if (car.size() > 2200) is True]
+        
+        # Generate bounding boxes
+        bboxes = [(car.show()) for car in self.tracked_vehicles]
+        
+        return bboxes, updated_map
+    
+    def find_vehicles(self, updated_heatmap, threshold=3.):   
+        
+        # Find pixels with value greater than threshold
+        x, y = (updated_heatmap > threshold).nonzero()
+        hot_pixels = np.dstack((y, x))[0].tolist()
+        
+        # Clear points from previous frames excepts the boundary
+        for i in self.tracked_vehicles: i.clear()
+   
+        # Merge a group of pixels into one car if their distance are close to each other
+        for pixel in hot_pixels:
+            if len(self.tracked_vehicles) is 0:
+                self.tracked_vehicles.append(Vehicle(pixel[0],pixel[1]))       
+            else:
+                found = False
+                for vehicle in self.tracked_vehicles:
+                    if vehicle.isNear(pixel[0], pixel[1]) is True:
+                        vehicle.add(pixel[0], pixel[1]) # add and update bounding box
+                        found = True
+                        break               
+                if found is False:
+                    # Can I combine?                        
+                    self.tracked_vehicles.append(Vehicle(pixel[0], pixel[1])) 
+        
+        # If car is not in a new frame, then remove
+        self.tracked_vehicles = [car for car in self.tracked_vehicles if car.in_frame()]
+        
+        # Check intersect
+        # http://stackoverflow.com/questions/642763/find-intersection-of-two-lists
+        return self.tracked_vehicles
+```
 
 
 ## 5. Video Implementation
 
 1. Provide a link to your final video output. Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.) 
 
-Here's a link to my video result: 
+Here's a link to my video result: [result](./result.mp4)
 
 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
 I recorded the positions of positive detections in each frame of the video. From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions. I then used scipy.ndimage.measurements.label() to identify individual blobs in the heatmap. I then assumed each blob corresponded to a vehicle. I constructed bounding boxes to cover the area of each blob detected.
-
-Here's an example result showing the heatmap from a series of frames of video, the result of scipy.ndimage.measurements.label() and the bounding boxes then overlaid on the last frame of video:
-
-Here are six frames and their corresponding heatmaps:
-
 
 ```
 # Parameter
@@ -176,6 +343,6 @@ def process_image(frame):
 ## Discussion
 1. Briefly discuss any problems / issues you faced in your implementation of this project. Where will your pipeline likely fail? What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.
+The pipeline still detects a few false positives. It is critical to NOT HAVE False positives. There are a few advanced OPENCV topics could improve the result of the project such as image segmentation to avoid overlapped bounding boxes.
 
-The pipeline still detects a few false positives. One thing that can help make this more reliable would be a way to detect the horizon and automatically mask out only those places where a vehicle can show up.
+If I have more time, I would rather use CNN combined with Image Sengmentation Method to improve the tracking process.
